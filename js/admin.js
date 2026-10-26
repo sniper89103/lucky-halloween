@@ -287,6 +287,7 @@
       '<div class="panel" style="margin-bottom:16px"><h3 style="margin-bottom:6px">🧪 Pruebas · ' + U.esc(st.sd.name) + '</h3><p style="margin:0 0 12px;opacity:.85;font-size:.9rem">Crea usuarios de prueba (4 votantes y 1 jurado) para ensayar con tu celular sin usar los códigos de tus compañeros. <b>Elimínalos antes del evento.</b></p>' +
       '<button class="btn purple small" data-act="addtest"' + (lock ? ' disabled' : '') + '>Crear usuarios de prueba</button> <button class="btn ghost small" data-act="deltest"' + (lock ? ' disabled' : '') + '>Eliminar usuarios de prueba</button> ' +
       (DB.mode === 'demo' ? '<button class="btn purple small" data-act="seed"' + (lock ? ' disabled' : '') + '>Cargar votos de prueba</button> <button class="btn purple small" data-act="seedtie"' + (lock ? ' disabled' : '') + '>Cargar prueba CON empate</button>' : '') + '</div>' +
+      (DB.mode !== 'demo' ? '<div class="panel" style="margin-bottom:16px"><h3 style="margin-bottom:6px">🔑 Códigos nuevos para toda la sede · ' + U.esc(st.sd.name) + '</h3><p style="margin:0 0 12px;opacity:.85;font-size:.9rem">Úsalo si perdiste el archivo de códigos. Genera un código <b>nuevo para cada persona</b> de esta sede (los anteriores dejan de servir y los aparatos quedan libres) y te da la lista para descargar. Tarda un poco: se crea una cuenta por persona.</p><button class="btn purple small" data-act="regenall"' + (lock ? ' disabled' : '') + '>Regenerar todos los códigos</button><div id="regMsg" style="margin-top:8px;font-size:.9rem"></div></div>' : '') +
       (DB.importSeed ? '<div class="panel" style="margin-bottom:16px"><h3 style="margin-bottom:6px">📥 Carga inicial desde seed.js</h3><p style="margin:0 0 10px;opacity:.85;font-size:.9rem">Elige tu archivo <code>seed.js</code> (el privado). Crea los organizadores, las personas y los equipos que falten, con <b>códigos nuevos</b>, y descarga la lista de códigos. Se omiten las sedes que ya tienen personas.</p><input type="file" id="seedFile" accept=".js,.json,.txt" class="field" style="max-width:360px"> <button class="btn purple small" data-act="importseed"' + (lock ? ' disabled' : '') + '>Importar</button><div id="impMsg" style="margin-top:8px;font-size:.9rem"></div></div>' : '') +
       '<div class="panel tbl-wrap"><h3 style="margin-bottom:8px">🛡️ Organizadores</h3><table class="tbl"><thead><tr><th>Nombre</th><th>Rol</th><th></th></tr></thead><tbody>' +
       st.staff.map(function (x) { return '<tr><td>' + U.esc(x.name) + '</td><td>' + roleLabel(x.role) + '</td><td><button class="btn ghost small" data-act="regenstaff" data-id="' + x.id + '">Generar código nuevo</button></td></tr>'; }).join('') + '</tbody></table></div>');
@@ -348,6 +349,22 @@
       return U.confirmModal({ emoji: '🗑️', title: '¿Eliminar a ' + q.name + '?', html: has ? 'Se eliminará su acceso y <b>también sus votos y su lugar en un equipo</b>. No se puede deshacer.' : 'Se eliminará su acceso. No se puede deshacer.', ok: 'Eliminar' }).then(function (ok) { if (ok) DB.deletePerson(st.sede, id).then(done('Persona eliminada')).catch(fail); }); }
     if (act === 'regen') { var r = personById(id);
       return U.confirmModal({ emoji: '🔑', title: 'Código nuevo para ' + r.name, html: 'El código anterior dejará de funcionar y el dispositivo queda libre.', ok: 'Generar' }).then(function (ok) { if (ok) DB.regenCode(st.sede, id).then(function (code) { return refresh().then(function () { render(); return showCodes('Código nuevo', [{ name: r.name, role: r.role, code: code }], 'codigo_' + st.sede + '.csv'); }); }).catch(fail); }); }
+    if (act === 'regenall') {
+      var plist = st.sd.people.slice(), rm = document.getElementById('regMsg');
+      return U.confirmModal({ emoji: '🔑', title: '¿Regenerar códigos de ' + plist.length + ' personas?', html: 'Los códigos actuales de <b>' + U.esc(st.sd.name) + '</b> dejarán de funcionar. Descarga la lista cuando termine y <b>no la pierdas</b>.', ok: 'Regenerar' }).then(function (ok) {
+        if (!ok) return;
+        var out = [], i = 0, failed = 0;
+        (function next() {
+          if (i >= plist.length) {
+            if (failed) U.toast('No se pudo regenerar ' + failed + ' persona(s). Repite la acción para las que faltan.', 'error');
+            if (!out.length) return;
+            return refresh().then(function () { render(); return showCodes('Códigos nuevos · ' + st.sd.name, out, 'codigos_' + st.sede + '.csv'); });
+          }
+          var pp = plist[i++]; if (rm) rm.textContent = 'Generando ' + i + ' de ' + plist.length + '…';
+          return DB.regenCode(st.sede, pp.id).then(function (code) { out.push({ name: pp.name, role: pp.role, code: code }); }, function () { failed++; }).then(next);
+        })();
+      });
+    }
     if (act === 'resetdev') return DB.resetDevice(st.sede, id).then(done('Dispositivo liberado')).catch(fail);
 
     if (act === 'addteam') return teamDialog(null).then(function (v) { if (v) DB.saveTeam(st.sede, v).then(done('Equipo creado')).catch(fail); });

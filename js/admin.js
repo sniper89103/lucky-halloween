@@ -208,7 +208,24 @@
   var lastSig = '';
   function favSig() { var f = fav(), p = st.prog || {}; return [st.sede, f.status, f.endsAt, f.rounds.length, p.voted, favOpen()].join('|'); }
   function startTimers() {
-    stopTimers(); if (st.tab !== 'favorito' || !st.me) return; lastSig = favSig();
+    stopTimers(); if (!st.me) return;
+    if (st.tab !== 'favorito') {
+      /* otras pestañas: se redibuja sola cuando cambian los datos (sin molestar si estás escribiendo o hay una ventana abierta) */
+      var sig = function () { return JSON.stringify([st.sede, st.stats, st.prog, st.res, st.sd && st.sd.people, st.sd && st.sd.state]); };
+      var last = sig(), tab0 = st.tab;
+      pollTimer = setInterval(function () {
+        if (st.tab !== tab0) return;
+        refresh().then(function () {
+          if (!active()) return render();
+          var n = sig(); if (n === last) return; last = n;
+          var a = document.activeElement, mr = document.getElementById('modal-root');
+          if ((a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) || (mr && mr.children.length)) { last = ''; return; }
+          render();
+        }).catch(function () { });
+      }, 2500);
+      return;
+    }
+    lastSig = favSig();
     clockTimer = setInterval(function () {
       var el = document.getElementById('admClock'); if (!el) return; var left = fav().endsAt - serverNow(); el.textContent = fmtClock(left);
       var c = document.getElementById('admClockCard'); if (c) c.classList.toggle('urgent', left <= 30000);
@@ -282,7 +299,7 @@
     var t = st.tab; if (t === 'sistema' && !isAdmin()) t = st.tab = 'panel';
     if (t === 'panel') viewPanel(); else if (t === 'personas') viewPersonas(); else if (t === 'equipos') viewEquipos();
     else if (t === 'favorito') viewFavorito(); else if (t === 'resultados') viewResultados(); else viewSistema();
-    if (t !== 'favorito') stopTimers();
+    if (t === 'sistema') stopTimers(); else if (t !== 'favorito') startTimers();
   }
 
   /* ---------- Eventos ---------- */

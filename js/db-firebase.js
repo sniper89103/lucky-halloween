@@ -305,6 +305,7 @@
     return appC.auth().createUserWithEmailAndPassword(email, pw).then(function (cred) { var uid = cred.user.uid; return appC.auth().signOut().then(function () { return uid; }); })
       .catch(function (e) {
         var c = (e && e.code) || '';
+        if (/email-already-in-use/.test(c)) throw fail('bad', 'Ese código ya está en uso en esta sede. Prueba con otro.');
         if (/too-many|quota/.test(c)) throw fail('rate', 'Firebase limitó la creación de cuentas. Espera unos minutos y repite con los que faltan.');
         if (/network/.test(c)) throw fail('net', 'Sin conexión.');
         throw fail('bad', 'No se pudo crear la cuenta (' + (c || e.message) + ').');
@@ -312,8 +313,10 @@
   }
   function newCode(name, prefix) { return L.randCode(prefix || (L.ascii(String(name).split(/\s+/)[0]).slice(0, 8) || 'LUCKY')); }
   /* crea persona + cuenta. Devuelve la persona con su código. */
+  /* código elegido a mano (ej. para que un jurado use el mismo en varias sedes): letras, números y guion, 6 a 24 caracteres */
+  function customCode(c) { c = norm(c); if (!/^[A-Z0-9][A-Z0-9-]{5,23}$/.test(c)) throw fail('bad', 'El código debe tener de 6 a 24 letras, números o guiones (sin espacios).'); return c; }
   function makePerson(sede, spec) {
-    var code = newCode(spec.name, spec.prefix), pid = spec.id || L.newId('p');
+    var code = spec.code ? customCode(spec.code) : newCode(spec.name, spec.prefix), pid = spec.id || L.newId('p');
     return createAccount(emailFor('p', sede, code), code).then(function (uid) {
       var b = sdb().batch();
       b.set(sdb().collection('users').doc(uid), { type: 'person', sede: sede, pid: pid, role: spec.role });
@@ -423,7 +426,7 @@
         var c = needActive(), s = sede_(c, sede); needUnlocked(s);
         if (!list || !list.length || list.length > 80) throw fail('bad', 'Agrega entre 1 y 80 personas a la vez.');
         var specs = [];
-        list.forEach(function (it) { var name = L.cleanName(it.name); if (name) specs.push({ name: name, role: it.role === 'jury' ? 'jury' : 'voter', test: !!it.test }); });
+        list.forEach(function (it) { var name = L.cleanName(it.name); if (name) specs.push({ name: name, role: it.role === 'jury' ? 'jury' : 'voter', test: !!it.test, code: it.code || '' }); });
         if (!specs.length) throw fail('bad', 'Escribe al menos un nombre.');
         var out = [];
         return serial(specs, function (sp) { return makePerson(sede, sp); }, out).then(function (err) {
@@ -453,10 +456,10 @@
         return cascadePerson(sede, id, p.uid, s).then(function () { return true; }, function (e) { throw mapErr(e); });
       });
     },
-    regenCode: function (sede, id) {
+    regenCode: function (sede, id, custom) {
       return Promise.resolve().then(function () {
         var c = needActive(), s = sede_(c, sede), p = L.personIn(s, id); if (!p) throw fail('bad', 'Persona no encontrada.');
-        var code = newCode(p.name);
+        var code = custom ? customCode(custom) : newCode(p.name);
         return createAccount(emailFor('p', sede, code), code).then(function (uid) {
           var db = sdb(), b = db.batch();
           b.set(db.collection('users').doc(uid), { type: 'person', sede: sede, pid: id, role: p.role });

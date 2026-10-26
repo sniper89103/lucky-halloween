@@ -25,6 +25,8 @@
   var appS = firebase.initializeApp(CFG, 'staff');      /* sesión de organizador (aparte, se pueden tener las dos) */
   var appC = firebase.initializeApp(CFG, 'creator');    /* solo para crear cuentas sin cerrar la sesión del organizador */
   try { appC.auth().setPersistence(firebase.auth.Auth.Persistence.NONE); } catch (e) { }
+  /* Algunos celulares/navegadores bloquean la conexión en tiempo real: se detecta y se usa un método alterno */
+  [appV, appS, appC].forEach(function (a) { try { a.firestore().settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { } });
 
   /* ---------- utilidades ---------- */
   function deviceId() {

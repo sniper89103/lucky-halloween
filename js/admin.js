@@ -103,7 +103,7 @@
 
   /* ---------- Estructura ---------- */
   function shell(inner) {
-    var tabs = [['panel', '🎛️ Panel'], ['personas', '👥 Personas'], ['equipos', '🎭 Equipos'], ['favorito', '🎩 Voto de todos'], ['resultados', '🏆 Resultados']];
+    var tabs = [['panel', '🎛️ Panel'], ['personas', '👥 Personas'], ['equipos', '🎭 Participantes'], ['favorito', '🎩 Voto de todos'], ['resultados', '🏆 Resultados']];
     if (isAdmin()) tabs.push(['sistema', '⚙️ Sistema']);
     view.innerHTML = '<div class="sede-bar">' + C.sedes.map(function (s) { var o = st.ov.filter(function (x) { return x.id === s.id; })[0]; return '<button class="sede-btn' + (s.id === st.sede ? ' on' : '') + '" data-sedechip="' + s.id + '">' + U.esc(s.name) + (o && o.locked ? ' 🔒' : '') + '</button>'; }).join('') + '</div>' +
       '<nav class="tabs">' + tabs.map(function (t) { return '<button class="tab' + (st.tab === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</nav>' + inner;
@@ -141,7 +141,7 @@
     var q = st.filter.toLowerCase(), lock = st.sd.locked;
     var rows = st.sd.people.filter(function (u) { return !q || u.name.toLowerCase().indexOf(q) >= 0; }).map(function (u) {
       return '<tr><td>' + U.esc(u.name) + (u.test ? ' <span class="chip warn">Prueba</span>' : '') + (u.note ? '<div style="font-size:.75rem;opacity:.7">' + U.esc(u.note) + '</div>' : '') + (u.blocked ? '<div class="alert-dev">⚠ ' + u.blocked + (u.blocked === 1 ? ' intento' : ' intentos') + ' desde otro aparato · ' + new Date(u.blockedAt).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' }) + '</div>' : '') + '</td>' +
-        '<td>' + (u.role === 'jury' ? '<span class="role-tag jury">Jurado</span>' : 'Votante') + '</td><td>' + (u.team ? '🎭' : '<span style="opacity:.5" title="No está en ningún equipo">—</span>') + '</td>' +
+        '<td>' + (u.role === 'jury' ? '<span class="role-tag jury">Jurado</span>' : 'Votante') + '</td><td>' + (u.team ? '🎭' : '<span style="opacity:.5" title="No participa en el concurso">—</span>') + '</td>' +
         '<td><span class="dot' + (u.joined ? ' on' : '') + '"></span>' + (u.joined ? 'Ingresó' : '—') + '</td><td>' + (u.favVoted ? '✅' : '—') + '</td><td>' + (u.role === 'jury' ? u.juryVotes + '/' + JURY_POSSIBLE() : '—') + '</td>' +
         '<td class="acts"><button class="btn ghost small" data-act="editperson" data-id="' + u.id + '"' + (lock ? ' disabled' : '') + '>Editar</button> <button class="btn ghost small" data-act="regen" data-id="' + u.id + '">Nuevo código</button> ' +
         ((u.bound || u.blocked) ? '<button class="btn ghost small" data-act="resetdev" data-id="' + u.id + '">Liberar dispositivo</button> ' : '') + '<button class="btn danger small" data-act="delperson" data-id="' + u.id + '"' + (lock ? ' disabled' : '') + '>Eliminar</button></td></tr>';
@@ -152,29 +152,29 @@
       '<textarea class="field" id="addNames" rows="4" placeholder="Ana Pérez&#10;Carlos Rojas Soto&#10;Jurado Ejemplo = CODIGO-A-ELEGIR (opcional)" style="min-height:90px"' + (lock ? ' disabled' : '') + '></textarea>' +
       '<div class="mins-row" style="margin-top:10px"><select class="field" id="addRole" style="max-width:200px"><option value="voter">Votante</option><option value="jury">Jurado</option></select><button class="btn primary" data-act="addpeople"' + (lock ? ' disabled' : '') + '>Agregar y generar códigos</button></div></div>' +
       '<div class="toolbar"><input class="field" id="flt" placeholder="Buscar persona…" value="' + U.esc(st.filter) + '"><span style="opacity:.8">' + st.sd.people.length + ' personas</span></div>' +
-      '<div class="panel tbl-wrap"><table class="tbl"><thead><tr><th>Nombre</th><th>Rol</th><th>Equipo</th><th>Ingreso</th><th>Fav.</th><th>Notas</th><th></th></tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="opacity:.7;padding:20px">Aún no hay personas en esta sede. Agrégalas arriba.</td></tr>') + '</tbody></table></div>' +
-      '<p style="opacity:.75;font-size:.85rem;margin-top:12px">“Nuevo código” también libera el dispositivo. Para que una persona pueda ser votada, agrégala a un equipo en la pestaña <b>Equipos</b>.</p>');
+      '<div class="panel tbl-wrap"><table class="tbl"><thead><tr><th>Nombre</th><th>Rol</th><th>Participa</th><th>Ingreso</th><th>Fav.</th><th>Notas</th><th></th></tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="opacity:.7;padding:20px">Aún no hay personas en esta sede. Agrégalas arriba.</td></tr>') + '</tbody></table></div>' +
+      '<p style="opacity:.75;font-size:.85rem;margin-top:12px">“Nuevo código” también libera el dispositivo. Para que una persona pueda ser votada, agrégala en la pestaña <b>Participantes</b> (aparecerá con 🎭 en la columna Participa).</p>');
     var f = document.getElementById('flt'); f.oninput = function () { st.filter = f.value; var p = f.selectionStart; viewPersonas(); var n = document.getElementById('flt'); n.focus(); n.setSelectionRange(p, p); };
   }
 
   /* ---------- Equipos ---------- */
   function viewEquipos() {
     var lock = st.sd.locked, loose = st.sd.people.filter(function (p) { return !p.team && !p.test; });
-    shell((lock ? '<div class="warn-box">🔒 El evento está bloqueado: no se pueden crear, editar ni eliminar equipos.</div>' : '') +
-      '<div class="toolbar"><button class="btn primary" data-act="addteam"' + (lock ? ' disabled' : '') + '>➕ Nuevo participante / equipo</button><span style="opacity:.8">' + st.sd.teams.length + ' participaciones · ' + st.sd.teams.reduce(function (n, t) { return n + t.members.length; }, 0) + ' personas que compiten</span></div>' +
-      '<p style="opacity:.8;font-size:.9rem;margin:0 0 12px">Una persona sola es <b>solo/a</b>, dos son <b>dúo</b> y tres o más son <b>grupo</b>. En las categorías de jurado se califica por equipo; en el favorito del público se vota por persona.</p>' +
+    shell((lock ? '<div class="warn-box">🔒 El evento está bloqueado: no se pueden crear, editar ni eliminar participantes.</div>' : '') +
+      '<div class="toolbar"><button class="btn primary" data-act="addteam"' + (lock ? ' disabled' : '') + '>➕ Nuevo participante</button><span style="opacity:.8">' + st.sd.teams.length + ' participaciones · ' + st.sd.teams.reduce(function (n, t) { return n + t.members.length; }, 0) + ' personas que compiten</span></div>' +
+      '<p style="opacity:.8;font-size:.9rem;margin:0 0 12px">Una persona sola es <b>solo/a</b>, dos son <b>dúo</b> y tres o más son <b>grupo</b>. En las categorías de jurado se califica a cada participante; en el favorito del público se vota por persona.</p>' +
       '<section class="grid">' + (st.sd.teams.map(function (t) {
         return '<article class="parchment pcard"><div class="row"><div class="avatar" style="background:hsl(' + U.hueFor(t.name) + ',45%,42%)">' + (t.kind === 'solo' ? U.esc(U.initials(t.name)) : t.kind === 'duo' ? '👯' : '👥') + '</div><div><h3>' + U.esc(t.name) + '</h3><div><span class="chip ' + t.kind + '">' + (t.kind === 'solo' ? 'Solo/a' : t.kind === 'duo' ? 'Dúo' : 'Grupo') + '</span>' + (t.pending ? '<span class="chip warn">Por confirmar</span>' : '') + '</div>' +
           (t.kind !== 'solo' ? '<div class="meta">' + U.esc(t.members.map(function (m) { return (st.sd.people.filter(function (p) { return p.id === m; })[0] || {}).name || '?'; }).join(', ')) + '</div>' : '') + (t.disfraz ? '<div class="meta">🎭 ' + U.esc(t.disfraz) + '</div>' : '') + '</div></div>' +
           '<div class="confirm-row"><div class="hint"></div><button class="btn ghost small" style="color:#3b1a6b;background:#e8dffa" data-act="editteam" data-id="' + t.id + '"' + (lock ? ' disabled' : '') + '>Editar</button><button class="btn danger small" data-act="delteam" data-id="' + t.id + '"' + (lock ? ' disabled' : '') + '>Eliminar</button></div></article>';
-      }).join('') || '<div class="empty" style="grid-column:1/-1"><div class="big">🎭</div><p>Aún no hay participantes en esta sede.<br>Agrega personas y luego crea sus equipos aquí.</p></div>') + '</section>' +
+      }).join('') || '<div class="empty" style="grid-column:1/-1"><div class="big">🎭</div><p>Aún no hay participantes en esta sede.<br>Agrega personas y luego créalas como participantes aquí.</p></div>') + '</section>' +
       (loose.length ? '<div class="warn-box" style="margin-top:16px">Personas que <b>no compiten</b> (solo votan): ' + U.esc(loose.map(function (p) { return p.name; }).join(', ')) + '.</div>' : ''));
   }
   function teamDialog(t) {
     var others = {}; st.sd.teams.forEach(function (x) { if (!t || x.id !== t.id) x.members.forEach(function (m) { others[m] = 1; }); });
     var cur = t ? t.members : [], list = st.sd.people.filter(function (p) { return !others[p.id]; });
-    return dialog({ emoji: '🎭', title: t ? 'Editar participante' : 'Nuevo participante / equipo', ok: 'Guardar',
-      body: '<label class="lbl">Nombre del equipo <small>(opcional: se arma solo)</small></label><input class="field" id="tName" value="' + U.esc(t ? t.name : '') + '" maxlength="60">' +
+    return dialog({ emoji: '🎭', title: t ? 'Editar participante' : 'Nuevo participante', ok: 'Guardar',
+      body: '<label class="lbl">Nombre del participante <small>(opcional: se arma solo)</small></label><input class="field" id="tName" value="' + U.esc(t ? t.name : '') + '" maxlength="60">' +
         '<label class="lbl">Nombre del disfraz <small>(opcional)</small></label><input class="field" id="tDis" value="' + U.esc(t ? t.disfraz : '') + '" maxlength="80">' +
         '<label class="lbl">Integrantes <small>(1 = solo, 2 = dúo, 3 o más = grupo)</small></label><div class="check-list">' +
         list.map(function (p) { return '<label class="chk"><input type="checkbox" value="' + p.id + '"' + (cur.indexOf(p.id) >= 0 ? ' checked' : '') + '> ' + U.esc(p.name) + '</label>'; }).join('') + '</div>' +
@@ -321,7 +321,7 @@
     }
     if (t.getAttribute && t.getAttribute('data-lock')) {
       var l = t.checked;
-      return U.confirmModal({ emoji: l ? '🔒' : '🔓', title: l ? '¿Activar el candado del evento?' : '¿Desactivar el candado?', html: l ? 'Nadie podrá editar personas, equipos ni reiniciar votos en <b>' + U.esc(st.sd.name) + '</b>.' : 'Se podrá volver a editar y reiniciar en <b>' + U.esc(st.sd.name) + '</b>.', ok: l ? 'Activar' : 'Desactivar' })
+      return U.confirmModal({ emoji: l ? '🔒' : '🔓', title: l ? '¿Activar el candado del evento?' : '¿Desactivar el candado?', html: l ? 'Nadie podrá editar personas, participantes ni reiniciar votos en <b>' + U.esc(st.sd.name) + '</b>.' : 'Se podrá volver a editar y reiniciar en <b>' + U.esc(st.sd.name) + '</b>.', ok: l ? 'Activar' : 'Desactivar' })
         .then(function (ok) { if (!ok) { t.checked = !l; return; } DB.lock(st.sede, l).then(done('Listo')).catch(fail); });
     }
   });
@@ -346,7 +346,7 @@
         read: function (w) { return { name: w.querySelector('#eN').value, role: w.querySelector('#eR').value, note: w.querySelector('#eT').value }; } })
         .then(function (v) { if (v) DB.updatePerson(st.sede, id, v).then(done('Guardado')).catch(fail); }); }
     if (act === 'delperson') { var q = personById(id), has = q.favVoted || q.juryVotes > 0 || (q.team && true);
-      return U.confirmModal({ emoji: '🗑️', title: '¿Eliminar a ' + q.name + '?', html: has ? 'Se eliminará su acceso y <b>también sus votos y su lugar en un equipo</b>. No se puede deshacer.' : 'Se eliminará su acceso. No se puede deshacer.', ok: 'Eliminar' }).then(function (ok) { if (ok) DB.deletePerson(st.sede, id).then(done('Persona eliminada')).catch(fail); }); }
+      return U.confirmModal({ emoji: '🗑️', title: '¿Eliminar a ' + q.name + '?', html: has ? 'Se eliminará su acceso y <b>también sus votos y su participación en el concurso</b>. No se puede deshacer.' : 'Se eliminará su acceso. No se puede deshacer.', ok: 'Eliminar' }).then(function (ok) { if (ok) DB.deletePerson(st.sede, id).then(done('Persona eliminada')).catch(fail); }); }
     if (act === 'regen') { var r = personById(id);
       return dialog({ emoji: '🔑', title: 'Código nuevo para ' + r.name, ok: 'Generar', body: '<p>El código anterior dejará de funcionar y el dispositivo queda libre.</p>' + (DB.mode !== 'demo' ? '<label class="lbl">Código a mano <small style="font-weight:400;opacity:.7">(opcional: déjalo vacío para uno al azar)</small></label><input class="field code-input" id="cC" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Ej: JURADO-ALEXIS">' : ''), read: function (w) { var i = w.querySelector('#cC'); return { code: i ? i.value.trim() : '' }; } }).then(function (ok) { if (ok) DB.regenCode(st.sede, id, ok.code).then(function (code) { return refresh().then(function () { render(); return showCodes('Código nuevo', [{ name: r.name, role: r.role, code: code }], 'codigo_' + st.sede + '.csv'); }); }).catch(fail); }); }
     if (act === 'regenall') {
@@ -367,7 +367,7 @@
     }
     if (act === 'resetdev') return DB.resetDevice(st.sede, id).then(done('Dispositivo liberado')).catch(fail);
 
-    if (act === 'addteam') return teamDialog(null).then(function (v) { if (v) DB.saveTeam(st.sede, v).then(done('Equipo creado')).catch(fail); });
+    if (act === 'addteam') return teamDialog(null).then(function (v) { if (v) DB.saveTeam(st.sede, v).then(done('Participante creado')).catch(fail); });
     if (act === 'editteam') return teamDialog(st.sd.teams.filter(function (x) { return x.id === id; })[0]).then(function (v) { if (v) DB.saveTeam(st.sede, v).then(done('Guardado')).catch(fail); });
     if (act === 'delteam') { var tm = st.sd.teams.filter(function (x) { return x.id === id; })[0];
       return U.confirmModal({ emoji: '🗑️', title: '¿Eliminar a ' + tm.name + '?', html: 'Se quitará de las categorías y se borrarán las notas y votos que recibió. Las personas siguen existiendo como votantes.', ok: 'Eliminar' }).then(function (ok) { if (ok) DB.deleteTeam(st.sede, id).then(done('Equipo eliminado')).catch(fail); }); }

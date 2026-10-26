@@ -1,0 +1,136 @@
+rules_version = '2';
+// Reglas de seguridad · Concurso de Disfraces Halloween · Grupo Lucky
+// Pegar en Firebase console → Firestore Database → Reglas → Publicar.
+// La CLAVE DE CONFIGURACIÓN (más abajo) solo sirve UNA vez: para crear al administrador desde admin.html.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- ayudas ----------
+    function signedIn() { return request.auth != null; }
+    function userPath() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function hasUser() { return signedIn() && exists(userPath()); }
+    function usr() { return get(userPath()).data; }
+    function isStaff() { return hasUser() && usr().type == 'staff'; }
+    function isAdmin() { return isStaff() && usr().role == 'admin'; }
+    function holder() { return get(/databases/$(database)/documents/meta/control).data.holder; }
+    // organizador activo = administrador (siempre) o quien tiene el control ahora
+    function isActive() { return isStaff() && (usr().role == 'admin' || holder() == usr().sid); }
+    function isPerson(sede) { return hasUser() && usr().type == 'person' && usr().sede == sede; }
+    function sedeDoc(sede) { return get(/databases/$(database)/documents/sedes/$(sede)).data; }
+    function unlocked(sede) { return sedeDoc(sede).get('locked', false) == false; }
+    // configuración inicial: solo mientras no exista meta/init y con la clave correcta
+    function booting() {
+      return signedIn()
+        && !exists(/databases/$(database)/documents/meta/init)
+        && getAfter(userPath()).data.get('setupKey', '') == 'YV93VGT4G8CKNT';
+    }
+    function keysChanged() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    // ---------- meta ----------
+    match /meta/init {
+      allow get: if true;
+      allow create: if booting();
+    }
+    match /meta/control {
+      allow get: if isStaff();
+      allow create: if booting();
+      allow update: if isActive()
+        && request.resource.data.keys().hasOnly(['holder'])
+        && (request.resource.data.holder == null
+            || (exists(/databases/$(database)/documents/staff/$(request.resource.data.holder))
+                && get(/databases/$(database)/documents/staff/$(request.resource.data.holder)).data.role != 'admin'));
+    }
+
+    // ---------- organizadores ----------
+    match /staff/{sid} {
+      allow read: if isStaff();
+      allow create: if booting() || isAdmin();
+      allow update: if isAdmin()
+        || (isStaff() && usr().sid == sid && keysChanged().hasOnly(['seen']));
+    }
+
+    // ---------- cuentas: qué es cada usuario de Firebase Auth ----------
+    match /users/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow create: if (signedIn() && request.auth.uid == uid && !exists(/databases/$(database)/documents/meta/init)
+                        && request.resource.data.type == 'staff' && request.resource.data.role == 'admin'
+                        && request.resource.data.sid == 'admin' && request.resource.data.setupKey == 'YV93VGT4G8CKNT')
+                    || isAdmin()
+                    || (isActive() && request.resource.data.type == 'person');
+      allow update, delete: if isAdmin()
+                    || (isActive() && resource.data.type == 'person');
+    }
+
+    // ---------- cada sede es un concurso independiente ----------
+    match /sedes/{sede} {
+      allow get: if isPerson(sede) || isActive();
+      allow create: if isActive();
+      // solo el administrador puede cambiar el candado
+      allow update: if isActive()
+        && (isAdmin() || request.resource.data.get('locked', false) == resource.data.get('locked', false));
+
+      match /people/{pid} {
+        allow get, list: if isPerson(sede) || isActive();
+        allow create, delete: if isActive() && unlocked(sede);
+        allow update:
+          if (isActive() && (unlocked(sede) || keysChanged().hasOnly(['device', 'joined', 'blocked', 'blockedAt', 'uid', 'seen'])))
+          // la propia persona: solo liga su dispositivo la primera vez y deja constancia de intentos
+          || (isPerson(sede) && usr().pid == pid
+              && keysChanged().hasOnly(['device', 'joined', 'blocked', 'blockedAt', 'seen'])
+              && (!keysChanged().hasAny(['device']) || resource.data.get('device', null) == null));
+      }
+
+      match /teams/{tid} {
+        allow get, list: if isPerson(sede) || isActive();
+        allow create, update, delete: if isActive() && unlocked(sede);
+      }
+
+      // un voto por persona y por ronda: el id del documento lo fuerza; no se puede editar ni borrar
+      match /votes/{vid} {
+        allow get, list: if isActive() || (isPerson(sede) && resource.data.pid == usr().pid);
+        allow create: if isPerson(sede)
+          && request.resource.data.keys().hasOnly(['pid', 'round', 'cand'])
+          && request.resource.data.pid == usr().pid
+          && request.resource.data.round is int
+          && vid == usr().pid + '__r' + string(request.resource.data.round)
+          && sedeDoc(sede).state.fav.status == 'open'
+          && request.resource.data.round == sedeDoc(sede).state.fav.rounds.size()
+          && request.time.toMillis() <= sedeDoc(sede).state.fav.endsAt + 2000
+          && request.resource.data.cand in sedeDoc(sede).state.fav.rounds[sedeDoc(sede).state.fav.rounds.size() - 1].cands;
+        allow update: if false;
+        allow delete: if isActive() && unlocked(sede);
+      }
+
+      // notas del jurado: solo jurados, solo mientras esté abierta la calificación, enteros del 1 al 10
+      match /scores/{kid} {
+        allow get, list: if isActive() || (isPerson(sede) && resource.data.pid == usr().pid);
+        allow create: if isPerson(sede) && usr().role == 'jury'
+          && sedeDoc(sede).state.juryOpen == true
+          && request.resource.data.keys().hasOnly(['pid', 'cat', 'team', 'score', 'comment'])
+          && request.resource.data.pid == usr().pid
+          && request.resource.data.cat in ['anio', 'creativo', 'grupal', 'interpretacion']
+          && request.resource.data.team is string
+          && kid == usr().pid + '__' + request.resource.data.cat + '__' + request.resource.data.team
+          && exists(/databases/$(database)/documents/sedes/$(sede)/teams/$(request.resource.data.team))
+          && request.resource.data.score is int && request.resource.data.score >= 1 && request.resource.data.score <= 10
+          && request.resource.data.comment is string && request.resource.data.comment.size() <= 140;
+        allow update:
+          // el jurado corrige su nota; "hidden" no lo puede tocar
+          if (isPerson(sede) && usr().role == 'jury'
+              && sedeDoc(sede).state.juryOpen == true
+              && resource.data.pid == usr().pid
+              && request.resource.data.keys().hasOnly(['pid', 'cat', 'team', 'score', 'comment', 'hidden'])
+              && request.resource.data.pid == usr().pid
+              && request.resource.data.cat == resource.data.cat
+              && request.resource.data.team == resource.data.team
+              && request.resource.data.score is int && request.resource.data.score >= 1 && request.resource.data.score <= 10
+              && request.resource.data.comment is string && request.resource.data.comment.size() <= 140
+              && request.resource.data.get('hidden', false) == resource.data.get('hidden', false))
+          // el organizador solo puede ocultar o mostrar un comentario
+          || (isActive() && keysChanged().hasOnly(['hidden']));
+        allow delete: if (isPerson(sede) && resource.data.pid == usr().pid && sedeDoc(sede).state.juryOpen == true)
+                      || (isActive() && unlocked(sede));
+      }
+    }
+  }
+}

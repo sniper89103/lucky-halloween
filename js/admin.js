@@ -211,7 +211,7 @@
     stopTimers(); if (!st.me) return;
     if (st.tab !== 'favorito') {
       /* otras pestañas: se redibuja sola cuando cambian los datos (sin molestar si estás escribiendo o hay una ventana abierta) */
-      var sig = function () { return JSON.stringify([st.sede, st.stats, st.prog, st.res, st.sd && st.sd.people, st.sd && st.sd.state]); };
+      var sig = function () { return JSON.stringify([st.sede, st.stats, st.prog, st.res, st.sd && st.sd.people, st.sd && st.sd.state && [st.sd.state.juryOpen, st.sd.state.fav]]); };
       var last = sig(), tab0 = st.tab;
       pollTimer = setInterval(function () {
         if (st.tab !== tab0) return;

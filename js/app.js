@@ -132,7 +132,7 @@
   function fmtClock(ms) { var s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
   function favSection(tab) {
     var info = favInfo(), mineName = info.mine ? nameOf(info.mine) : '', head = '', runoff = info.round > 1;
-    if (info.idle) head = '<div class="status-card"><div class="ghost-float">' + Decor.ghost + '</div><div><h3>La votación de «Mejor disfraz del año» aún no inicia</h3><p>Cuando el organizador pulse <b>Iniciar</b>, todos votamos a la vez con un reloj. Tendrás <b>un solo voto</b>, con confirmación, y no se podrá cambiar.</p></div></div>';
+    if (info.idle) head = '<div class="status-card"><div class="ghost-float">' + Decor.ghost + '</div><div><h3>La votación de «Favorito del público» aún no inicia</h3><p>Cuando el organizador pulse <b>Iniciar</b>, todos votamos a la vez con un reloj. Tendrás <b>un solo voto</b>, con confirmación, y no se podrá cambiar.</p></div></div>';
     else if (info.open) head = '<div class="clock-card' + (runoff ? ' runoff' : '') + '">' + (runoff ? '<div class="round-banner">⚔️ ¡DESEMPATE! Solo estos nombres</div>' : '') +
       '<div class="clock-label">' + (info.mine ? 'Gracias por votar · tiempo restante' : '¡Vota ahora! Tiempo restante') + '</div><div class="clock" id="clock">' + fmtClock(info.endsAt - serverNow()) + '</div>' +
       (info.mine ? '<div class="voted-line">✅ Votaste por <b>' + U.esc(mineName) + '</b> · tu voto no se puede cambiar</div>' : '<div class="voted-line">Toca el nombre de tu favorito y confirma con <b>Sí</b>.</div>') + '</div>';
@@ -249,7 +249,7 @@
       if (sig === lastSig && !force) return;
       var wasInit = lastSig !== ''; lastSig = sig;
       var nf = s.fav, started = nf.status === 'open' && (prev.status !== 'open' || prev.rounds.length !== nf.rounds.length);
-      if (wasInit && started) { FX.sfx.boo(); st.tab = FAV.id; U.toast(nf.rounds.length > 1 ? '⚔️ ¡Desempate! Vota de nuevo entre los empatados' : '🗳️ ¡Comenzó la votación de «Mejor disfraz del año»!', 'info'); }
+      if (wasInit && started) { FX.sfx.boo(); st.tab = FAV.id; U.toast(nf.rounds.length > 1 ? '⚔️ ¡Desempate! Vota de nuevo entre los empatados' : '🗳️ ¡Comenzó la votación de «Favorito del público»!', 'info'); }
       else if (wasInit) FX.sfx.pick();
       if (nf.rounds.length !== prev.rounds.length) return loadAll().then(renderHome);
       renderHome();
